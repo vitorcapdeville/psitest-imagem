@@ -1,0 +1,5 @@
+python-multipart
+fastapi[standard]
+ruff
+opencv-python
+numpy
