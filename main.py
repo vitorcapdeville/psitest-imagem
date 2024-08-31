@@ -1,28 +1,50 @@
+from contextlib import asynccontextmanager
+from typing import Any
+
 import cv2 as cv
 import keras
 import numpy as np
 from fastapi import FastAPI, Response, UploadFile
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, RootModel, model_validator
 
-app = FastAPI()
+ml_models = {}
 
 
-class Boxes(BaseModel):
-    boxes: list[tuple[int, int, int, int]] = [(1, 1, 1, 1), (1, 1, 1, 1)]
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Load the ML model
+    ml_models["box_classifier"] = keras.saving.load_model("model.keras")
+    yield
+    # Clean up the ML models and release the resources
+    ml_models.clear()
+
+
+app = FastAPI(lifespan=lifespan)
+
+
+class Boxes(RootModel):
+    root: list[tuple[int, int, int, int]] = [(1, 1, 1, 1), (1, 1, 1, 1)]
+
+    def __len__(self):
+        return len(self.root)
+
+
+class Labels(RootModel):
+    root: list[str] = ["empty", "confirmed"]
+
+    def __len__(self):
+        return len(self.root)
 
 
 class AnnotatedBoxes(BaseModel):
-    classes: list[str] = ["empty", "confirmed"]
-    boxes: list[tuple[int, int, int, int]] = [(1, 1, 1, 1), (1, 1, 1, 1)]
+    classes: Labels
+    boxes: Boxes
 
     @model_validator(mode="after")
     def lengths_match(self):
         if len(self.classes) != len(self.boxes):
             raise ValueError("Length of classes is not the same as length of the boxes.")
         return self
-
-
-model = keras.saving.load_model("model.keras")
 
 
 # Função para calcular a distância entre dois pontos
@@ -48,7 +70,7 @@ def get_bounding_boxes(img: np.ndarray, template: np.ndarray, threshold: float) 
 
 
 def classify_boxes(
-    img: np.ndarray, boxes: list[tuple[int, int, int, int]], prediction_threshold: float = 0.9
+    img: np.ndarray, boxes: list[tuple[int, int, int, int]], model: Any, prediction_threshold: float = 0.9
 ) -> list[str]:
     response = []
     mapping = {True: "confirmed", False: "empty"}
@@ -57,6 +79,7 @@ def classify_boxes(
         box_img = cv.resize(box_img, (224, 224))
         box_img = keras.ops.expand_dims(box_img, axis=0)
         prediction = model.predict(box_img, verbose=0)
+        prediction = float(keras.ops.sigmoid(prediction[0][0]))
         response.append(mapping[bool((1 - prediction) >= prediction_threshold)])
     return response
 
@@ -70,7 +93,8 @@ async def read_image(image: UploadFile, flags: int) -> np.ndarray:
 
 
 # TODO: Como posso colocar n templates?
-# TODO: Incluir o modelo treinado.
+# TODO: Aplicar a previsão em cima do array de imagens ao inves de prever uma a uma.
+# TODO: Retornar a probabilidade de cada classe ao inves de so a classe prevista.
 
 
 @app.post("/find_boxes/")
@@ -80,7 +104,7 @@ async def find_boxes(test_image: UploadFile, box_image: UploadFile, threshold: f
 
     boxes = get_bounding_boxes(img_rgb, template, threshold)
 
-    return {"boxes": boxes}
+    return Boxes(root=boxes)
 
 
 @app.post("/find_answers/")
@@ -92,9 +116,9 @@ async def find_answers(
 
     boxes = get_bounding_boxes(img_rgb, template, threshold)
 
-    responses = classify_boxes(img_rgb, boxes, prediction_threshold)
+    responses = classify_boxes(img_rgb, boxes, ml_models["box_classifier"], prediction_threshold)
 
-    return AnnotatedBoxes(classes=responses, boxes=boxes)
+    return AnnotatedBoxes(classes=Labels(root=responses), boxes=Boxes(root=boxes))
 
 
 @app.post(
@@ -137,7 +161,7 @@ async def mark_answers(
 
     boxes = get_bounding_boxes(img_rgb, template, threshold)
 
-    responses = classify_boxes(img_rgb, boxes, prediction_threshold)
+    responses = classify_boxes(img_rgb, boxes, ml_models["box_classifier"], prediction_threshold)
 
     mapping = {"empty": (0, 0, 255), "confirmed": (255, 0, 255)}
 
