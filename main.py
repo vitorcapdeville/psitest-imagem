@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 import cv2 as cv
 import keras
 from fastapi import FastAPI, Response, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 
 from functions import classify_boxes, get_bounding_boxes, read_image
 from models import AnnotatedBoxes, Boxes, Confidence, Labels
@@ -20,7 +21,18 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+origins = [
+    "http://localhost",
+    "http://localhost:3000",
+]
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # TODO: Como posso colocar n templates?
 # TODO: Aplicar a previsão em cima do array de imagens ao inves de prever uma a uma.
