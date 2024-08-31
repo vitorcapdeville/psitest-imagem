@@ -3,3 +3,5 @@ fastapi[standard]
 ruff
 opencv-python
 numpy
+keras>=3.5
+tensorflow
