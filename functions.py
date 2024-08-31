@@ -33,16 +33,16 @@ def classify_boxes(
 ) -> list[str]:
     response = []
     confidence = []
-    mapping = {False: "confirmed", True: "empty"}
-    mapping_2 = {True: lambda x: x, False: lambda x: 1 - x}
+    mapping_label = {False: "confirmed", True: "empty"}
+    mapping_confidence = {True: lambda x: x, False: lambda x: 1 - x}
     for box in boxes:
         box_img = img[box[1] : box[3], box[0] : box[2]]
         box_img = cv.resize(box_img, (224, 224))
         box_img = keras.ops.expand_dims(box_img, axis=0)
-        prediction = model.predict(box_img, verbose=0)
+        prediction = model(box_img)
         prediction = float(keras.ops.sigmoid(prediction[0][0]))
-        response.append(mapping[bool(prediction >= prediction_threshold)])
-        confidence.append(mapping_2[bool(prediction >= prediction_threshold)](prediction))
+        response.append(mapping_label[bool(prediction >= prediction_threshold)])
+        confidence.append(mapping_confidence[bool(prediction >= prediction_threshold)](prediction))
     return response, confidence
 
 
