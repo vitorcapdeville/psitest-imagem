@@ -40,9 +40,9 @@ app.add_middleware(
 
 
 @app.post("/find_boxes/")
-async def find_boxes(test_image: UploadFile, box_image: UploadFile, threshold: float = 0.5) -> Boxes:
+async def find_boxes(test_image: UploadFile, box_images: list[UploadFile], threshold: float = 0.5) -> Boxes:
     img_rgb = await read_image(test_image, flags=cv.IMREAD_COLOR)
-    template = await read_image(box_image, flags=cv.IMREAD_GRAYSCALE)
+    template = [await read_image(box_image, flags=cv.IMREAD_GRAYSCALE) for box_image in box_images]
 
     boxes = get_bounding_boxes(img_rgb, template, threshold)
 
@@ -51,10 +51,10 @@ async def find_boxes(test_image: UploadFile, box_image: UploadFile, threshold: f
 
 @app.post("/find_answers/")
 async def find_answers(
-    test_image: UploadFile, box_image: UploadFile, threshold: float = 0.5, prediction_threshold: float = 0.9
+    test_image: UploadFile, box_images: list[UploadFile], threshold: float = 0.5, prediction_threshold: float = 0.9
 ) -> AnnotatedBoxes:
     img_rgb = await read_image(test_image, flags=cv.IMREAD_COLOR)
-    template = await read_image(box_image, flags=cv.IMREAD_GRAYSCALE)
+    template = [await read_image(box_image, flags=cv.IMREAD_GRAYSCALE) for box_image in box_images]
 
     boxes = get_bounding_boxes(img_rgb, template, threshold)
 
@@ -74,9 +74,9 @@ async def find_answers(
     # https://github.com/tiangolo/fastapi/issues/3258
     response_class=Response,
 )
-async def mark_boxes(test_image: UploadFile, box_image: UploadFile, threshold: float = 0.5):
+async def mark_boxes(test_image: UploadFile, box_images: list[UploadFile], threshold: float = 0.5):
     img_rgb = await read_image(test_image, flags=cv.IMREAD_COLOR)
-    template = await read_image(box_image, flags=cv.IMREAD_GRAYSCALE)
+    template = [await read_image(box_image, flags=cv.IMREAD_GRAYSCALE) for box_image in box_images]
 
     boxes = get_bounding_boxes(img_rgb, template, threshold)
 
@@ -98,10 +98,10 @@ async def mark_boxes(test_image: UploadFile, box_image: UploadFile, threshold: f
     response_class=Response,
 )
 async def mark_answers(
-    test_image: UploadFile, box_image: UploadFile, threshold: float = 0.5, prediction_threshold: float = 0.9
+    test_image: UploadFile, box_images: list[UploadFile], threshold: float = 0.5, prediction_threshold: float = 0.9
 ):
     img_rgb = await read_image(test_image, flags=cv.IMREAD_COLOR)
-    template = await read_image(box_image, flags=cv.IMREAD_GRAYSCALE)
+    template = [await read_image(box_image, flags=cv.IMREAD_GRAYSCALE) for box_image in box_images]
 
     boxes = get_bounding_boxes(img_rgb, template, threshold)
 

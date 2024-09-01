@@ -11,20 +11,23 @@ def distancia(pt1, pt2):
     return np.sqrt((pt1[0] - pt2[0]) ** 2 + (pt1[1] - pt2[1]) ** 2)
 
 
-def get_bounding_boxes(img: np.ndarray, template: np.ndarray, threshold: float) -> list:
-    w, h = template.shape[::-1]
-
+def get_bounding_boxes(img: np.ndarray, templates: list[np.ndarray], threshold: float) -> list:
     img_gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
-    res = cv.matchTemplate(img_gray, template, cv.TM_CCOEFF_NORMED)
-    loc = np.where(res >= threshold)
+
+    w, h = templates[0].shape[::-1]
+    resized_templates = (cv.resize(template, (w, h)) for template in templates)
+    matches = (cv.matchTemplate(img_gray, template, cv.TM_CCOEFF_NORMED) for template in resized_templates)
+
+    loc = np.where(np.logical_or.reduce([match >= threshold for match in matches]))
+
     boxes = []
 
-    # Processar cada ponto encontrado
     for pt in zip(*loc[::-1]):
         # Verificar se o ponto está muito próximo de algum ponto já processado
-        if all(distancia(pt, p) > 100 for p in boxes):  # Limiar de distância = 10 pixels
+        if all(distancia(pt, p) > 100 for p in boxes):
             box = (pt[0], pt[1], pt[0] + w, pt[1] + h)
             boxes.append(box)
+
     return boxes
 
 
