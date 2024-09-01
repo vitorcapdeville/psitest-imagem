@@ -6,7 +6,7 @@ from fastapi import FastAPI, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
 from functions import classify_boxes, get_bounding_boxes, read_image
-from models import AnnotatedBoxes, Boxes, Confidence, Size
+from models import AnnotatedBoxes, Confidence, ImageAnnotation, Object, Size
 
 ml_models = {}
 
@@ -40,27 +40,33 @@ app.add_middleware(
 
 
 @app.post("/find_boxes/")
-async def find_boxes(test_image: UploadFile, box_images: list[UploadFile], threshold: float = 0.5) -> Boxes:
+async def find_boxes(test_image: UploadFile, box_images: list[UploadFile], threshold: float = 0.5) -> ImageAnnotation:
     img_rgb = await read_image(test_image, flags=cv.IMREAD_COLOR)
     template = [await read_image(box_image, flags=cv.IMREAD_GRAYSCALE) for box_image in box_images]
 
     boxes = get_bounding_boxes(img_rgb, template, threshold)
     w, h, d = img_rgb.shape
-    return Boxes(image_size=Size(width=w, height=h, depth=d), boxes=boxes)
+    return ImageAnnotation(size=Size(width=w, height=h, depth=d), objects=[Object(bounding_box=box) for box in boxes])
 
 
 @app.post("/find_answers/")
 async def find_answers(
     test_image: UploadFile, box_images: list[UploadFile], threshold: float = 0.5, prediction_threshold: float = 0.9
-) -> AnnotatedBoxes:
+) -> ImageAnnotation:
     img_rgb = await read_image(test_image, flags=cv.IMREAD_COLOR)
     template = [await read_image(box_image, flags=cv.IMREAD_GRAYSCALE) for box_image in box_images]
 
     boxes = get_bounding_boxes(img_rgb, template, threshold)
 
-    responses, confidence = classify_boxes(img_rgb, boxes, ml_models["box_classifier"], prediction_threshold)
-
-    return AnnotatedBoxes(boxes=boxes, labels=responses, confidence=Confidence(root=confidence))
+    responses, confidences = classify_boxes(img_rgb, boxes, ml_models["box_classifier"], prediction_threshold)
+    w, h, d = img_rgb.shape
+    return ImageAnnotation(
+        size=Size(width=w, height=h, depth=d),
+        objects=[
+            Object(name=label, bounding_box=box, confidence=confidence)
+            for label, box, confidence in zip(responses, boxes, confidences)
+        ],
+    )
 
 
 @app.post(

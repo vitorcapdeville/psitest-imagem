@@ -48,19 +48,15 @@ class Size(BaseModel):
     depth: int
 
 
-class Boxes(BaseModel):
-    image_size: Size
-    boxes: list[Box]
-
-
 class Object(BaseModel):
-    name: str
+    name: Label = Label.empty
     bounding_box: Box
+    confidence: float = 1.0
 
 
 class ImageAnnotation(BaseModel):
-    folder: str
-    filename: str
-    path: str
+    folder: str = ""
+    filename: str = ""
+    path: str = ""
     size: Size
     objects: list[Object]
