@@ -6,7 +6,7 @@ from fastapi import FastAPI, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
 from functions import classify_boxes, get_bounding_boxes, read_image
-from models import AnnotatedBoxes, Boxes, Confidence, Labels
+from models import AnnotatedBoxes, Boxes, Confidence, Size
 
 ml_models = {}
 
@@ -45,8 +45,8 @@ async def find_boxes(test_image: UploadFile, box_images: list[UploadFile], thres
     template = [await read_image(box_image, flags=cv.IMREAD_GRAYSCALE) for box_image in box_images]
 
     boxes = get_bounding_boxes(img_rgb, template, threshold)
-
-    return Boxes(root=boxes)
+    w, h, d = img_rgb.shape
+    return Boxes(image_size=Size(width=w, height=h, depth=d), boxes=boxes)
 
 
 @app.post("/find_answers/")
@@ -60,9 +60,7 @@ async def find_answers(
 
     responses, confidence = classify_boxes(img_rgb, boxes, ml_models["box_classifier"], prediction_threshold)
 
-    return AnnotatedBoxes(
-        boxes=Boxes(root=boxes), labels=Labels(root=responses), confidence=Confidence(root=confidence)
-    )
+    return AnnotatedBoxes(boxes=boxes, labels=responses, confidence=Confidence(root=confidence))
 
 
 @app.post(
@@ -81,7 +79,7 @@ async def mark_boxes(test_image: UploadFile, box_images: list[UploadFile], thres
     boxes = get_bounding_boxes(img_rgb, template, threshold)
 
     for box in boxes:
-        cv.rectangle(img_rgb, (box[0], box[1]), (box[2], box[3]), (0, 0, 255), 2)
+        cv.rectangle(img_rgb, (box.x_min, box.y_min), (box.x_max, box.y_max), (0, 0, 255), 2)
 
     _, encoded_img = cv.imencode(".PNG", img_rgb)
 
@@ -111,7 +109,7 @@ async def mark_answers(
 
     for box, response in zip(boxes, responses):
         color = mapping[response]
-        cv.rectangle(img_rgb, (box[0], box[1]), (box[2], box[3]), color, 2)
+        cv.rectangle(img_rgb, (box.x_min, box.y_min), (box.x_max, box.y_max), color, 2)
 
     _, encoded_img = cv.imencode(".PNG", img_rgb)
 

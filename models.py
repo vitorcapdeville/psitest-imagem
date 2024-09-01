@@ -8,18 +8,11 @@ class Label(str, Enum):
     confirmed = "confirmed"
 
 
-class Boxes(RootModel):
-    root: list[tuple[int, int, int, int]] = [(1, 1, 1, 1), (1, 1, 1, 1)]
-
-    def __len__(self):
-        return len(self.root)
-
-
-class Labels(RootModel):
-    root: list[Label] = [Label.empty, Label.confirmed]
-
-    def __len__(self):
-        return len(self.root)
+class Box(BaseModel):
+    x_min: int
+    y_min: int
+    x_max: int
+    y_max: int
 
 
 class Confidence(RootModel):
@@ -36,9 +29,9 @@ class Confidence(RootModel):
 
 
 class AnnotatedBoxes(BaseModel):
-    boxes: Boxes
+    boxes: list[Box]
     confidence: Confidence
-    labels: Labels
+    labels: list[Label]
 
     @model_validator(mode="after")
     def lengths_match(self):
@@ -47,3 +40,27 @@ class AnnotatedBoxes(BaseModel):
         if len(self.labels) != len(self.confidence):
             raise ValueError("Length of labels is not the same as length of the confidence.")
         return self
+
+
+class Size(BaseModel):
+    width: int
+    height: int
+    depth: int
+
+
+class Boxes(BaseModel):
+    image_size: Size
+    boxes: list[Box]
+
+
+class Object(BaseModel):
+    name: str
+    bounding_box: Box
+
+
+class ImageAnnotation(BaseModel):
+    folder: str
+    filename: str
+    path: str
+    size: Size
+    objects: list[Object]
