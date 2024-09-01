@@ -6,7 +6,7 @@ from fastapi import FastAPI, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
 from functions import classify_boxes, get_bounding_boxes, read_image
-from models import AnnotatedBoxes, Confidence, ImageAnnotation, Object, Size
+from models import ImageAnnotation, Object, Size
 
 ml_models = {}
 
