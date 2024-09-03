@@ -5,3 +5,8 @@ opencv-python
 numpy
 keras>=3.5
 tensorflow
+pymongo
+motor
+pydantic-settings
+gdown
+beanie

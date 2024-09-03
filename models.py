@@ -1,5 +1,7 @@
 from enum import Enum
+from typing import Optional
 
+from beanie import Document, init_beanie
 from pydantic import BaseModel
 
 
@@ -27,9 +29,15 @@ class Object(BaseModel):
     confidence: float = 1.0
 
 
-class ImageAnnotation(BaseModel):
-    folder: str = ""
-    filename: str = ""
+class ImageAnnotation(Document):
     path: str = ""
     size: Size
-    objects: list[Object]
+    objects: Optional[list[Object]] = None
+
+    class Settings:
+        name = "imagens"
+        keep_nulls = False
+
+
+async def init(database):
+    await init_beanie(database=database, document_models=[ImageAnnotation])
