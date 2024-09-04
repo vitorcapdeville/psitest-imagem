@@ -1,5 +1,8 @@
+import os
+import uuid
 from contextlib import asynccontextmanager
 from logging import info
+from pathlib import Path
 
 import cv2 as cv
 import keras
@@ -14,7 +17,6 @@ from settings import get_settings
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Load the ML model
     settings = get_settings()
     app.model = keras.saving.load_model("model.keras")
     client = motor.motor_asyncio.AsyncIOMotorClient(settings.MONGODB_URL)
@@ -48,82 +50,95 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# TODO: Como posso colocar n templates?
-# TODO: Aplicar a previsão em cima do array de imagens ao inves de prever uma a uma.
-# TODO: Retornar a probabilidade de cada classe ao inves de so a classe prevista.
 
+@app.post("/save_image")
+async def save_image(image: UploadFile):
+    out_dir = Path("uploaded_images")
+    out_dir.mkdir(parents=True, exist_ok=True)
+    unique_filename = f"{uuid.uuid4()}_{image.filename}"
+    out_path = out_dir / unique_filename
 
-@app.post("/find_boxes/")
-async def find_boxes(test_image: UploadFile, box_images: list[UploadFile], threshold: float = 0.5) -> ImageAnnotation:
-    img_rgb = await read_image(test_image, flags=cv.IMREAD_COLOR)
-    template = [await read_image(box_image, flags=cv.IMREAD_GRAYSCALE) for box_image in box_images]
+    image_array = await read_image(image, flags=cv.IMREAD_COLOR)
 
-    boxes = get_bounding_boxes(img_rgb, template, threshold)
-    w, h, d = img_rgb.shape
-    return ImageAnnotation(size=Size(width=w, height=h, depth=d), objects=[Object(bounding_box=box) for box in boxes])
+    w, h, d = image_array.shape
+    size = Size(width=w, height=h, depth=d)
 
-
-@app.post("/find_answers/")
-async def find_answers(
-    test_image: UploadFile, box_images: list[UploadFile], threshold: float = 0.5, prediction_threshold: float = 0.9
-) -> ImageAnnotation:
-    img_rgb = await read_image(test_image, flags=cv.IMREAD_COLOR)
-    template = [await read_image(box_image, flags=cv.IMREAD_GRAYSCALE) for box_image in box_images]
-
-    boxes = get_bounding_boxes(img_rgb, template, threshold)
-
-    responses, confidences = classify_boxes(img_rgb, boxes, app.model, prediction_threshold)
-    w, h, d = img_rgb.shape
-    return ImageAnnotation(
-        size=Size(width=w, height=h, depth=d),
-        objects=[
-            Object(name=label, bounding_box=box, confidence=confidence)
-            for label, box, confidence in zip(responses, boxes, confidences)
-        ],
+    image_annotation = ImageAnnotation(
+        path=str(out_path),
+        size=size,
     )
 
+    cv.imwrite(str(out_path), image_array)
+    inserted = await image_annotation.insert()
 
-@app.post("/mark_boxes/")
-async def mark_boxes(test_image: UploadFile, box_images: list[UploadFile], threshold: float = 0.5):
-    img_rgb = await read_image(test_image, flags=cv.IMREAD_COLOR)
-    template = [await read_image(box_image, flags=cv.IMREAD_GRAYSCALE) for box_image in box_images]
-
-    boxes = get_bounding_boxes(img_rgb, template, threshold)
-
-    for box in boxes:
-        cv.rectangle(img_rgb, (box.x_min, box.y_min), (box.x_max, box.y_max), (0, 0, 255), 2)
-
-    _, encoded_img = cv.imencode(".PNG", img_rgb)
-
-    return Response(content=encoded_img.tostring(), media_type="image/png")
+    return inserted
 
 
-@app.post("/mark_answers/")
-async def mark_answers(
-    test_image: UploadFile, box_images: list[UploadFile], threshold: float = 0.5, prediction_threshold: float = 0.9
-):
-    img_rgb = await read_image(test_image, flags=cv.IMREAD_COLOR)
-    template = [await read_image(box_image, flags=cv.IMREAD_GRAYSCALE) for box_image in box_images]
-
-    boxes = get_bounding_boxes(img_rgb, template, threshold)
-
-    responses, _ = classify_boxes(img_rgb, boxes, app.model, prediction_threshold)
-
-    mapping = {"empty": (0, 0, 255), "confirmed": (255, 0, 255)}
-
-    for box, response in zip(boxes, responses):
-        color = mapping[response]
-        cv.rectangle(img_rgb, (box.x_min, box.y_min), (box.x_max, box.y_max), color, 2)
-
-    _, encoded_img = cv.imencode(".PNG", img_rgb)
-
-    return Response(content=encoded_img.tostring(), media_type="image/png")
+@app.get("/image_annotation")
+async def get_image(image_id: str):
+    result = await ImageAnnotation.get(image_id)
+    return result
 
 
-@app.get("/image")
-async def get_image():
-    result = await ImageAnnotation.find_one(ImageAnnotation.path == "data\\exam0_10_1.png")
-    img = cv.imread(result.path)
+@app.get("/show_image")
+async def show_image(image_id: str, show_annotations: bool = True):
+    result = await ImageAnnotation.get(image_id)
+    img = cv.imread(result.path, cv.IMREAD_COLOR)
+
+    if show_annotations:
+        for object in result.objects:
+            box = object.bounding_box
+
+            color = {
+                "empty": (0, 0, 255),
+                "confirmed": (255, 0, 255),
+            }[object.name]
+
+            cv.rectangle(img, (box.x_min, box.y_min), (box.x_max, box.y_max), color, 2)
+
     _, encoded_img = cv.imencode(".PNG", img)
 
     return Response(content=encoded_img.tostring(), media_type="image/png")
+
+
+@app.delete("/delete_image")
+async def delete_image(image_id: str):
+    image_annotation = await ImageAnnotation.get(image_id)
+    await image_annotation.delete()
+    os.remove(image_annotation.path)
+    return {"message": "Image deleted"}
+
+
+@app.post("/find_boxes/")
+async def find_boxes(image_id: str, box_images: list[UploadFile], threshold: float = 0.5) -> ImageAnnotation:
+    image_annotation = await ImageAnnotation.get(image_id)
+
+    img_rgb = cv.imread(image_annotation.path)
+    template = [await read_image(box_image, flags=cv.IMREAD_GRAYSCALE) for box_image in box_images]
+
+    boxes = get_bounding_boxes(img_rgb, template, threshold)
+    image_annotation.objects = [Object(bounding_box=box) for box in boxes]
+    await image_annotation.replace()
+    return image_annotation
+
+
+@app.post("/find_answers/")
+async def find_answers(image_id: str, prediction_threshold: float = 0.9) -> ImageAnnotation:
+    image_annotation = await ImageAnnotation.get(image_id)
+    if len(image_annotation.objects) == 0:
+        return image_annotation
+
+    img_rgb = cv.imread(image_annotation.path)
+
+    boxes = [object.bounding_box for object in image_annotation.objects]
+
+    responses, confidences = classify_boxes(img_rgb, boxes, app.model, prediction_threshold)
+
+    image_annotation.objects = [
+        Object(name=label, bounding_box=box, confidence=confidence)
+        for label, box, confidence in zip(responses, boxes, confidences)
+    ]
+
+    await image_annotation.replace()
+
+    return image_annotation

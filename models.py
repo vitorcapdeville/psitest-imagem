@@ -1,8 +1,7 @@
 from enum import Enum
-from typing import Optional
 
 from beanie import Document, init_beanie
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class Label(str, Enum):
@@ -32,7 +31,7 @@ class Object(BaseModel):
 class ImageAnnotation(Document):
     path: str = ""
     size: Size
-    objects: Optional[list[Object]] = None
+    objects: list[Object] = Field(default_factory=list)
 
     class Settings:
         name = "imagens"

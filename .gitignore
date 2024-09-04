@@ -6,3 +6,4 @@ test_images/
 .env
 raw_data/
 data/
+uploaded_images/
