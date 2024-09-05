@@ -80,7 +80,7 @@ async def get_image(image_id: str):
     return result
 
 
-@app.get("/show_image")
+@app.get("/show_image/")
 async def show_image(image_id: str, show_annotations: bool = True):
     result = await ImageAnnotation.get(image_id)
     img = cv.imread(result.path, cv.IMREAD_COLOR)
