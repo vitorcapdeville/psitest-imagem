@@ -52,7 +52,7 @@ app.add_middleware(
 
 
 @app.post("/save_image")
-async def save_image(image: UploadFile):
+async def save_image(image: UploadFile) -> ImageAnnotation:
     out_dir = Path("uploaded_images")
     out_dir.mkdir(parents=True, exist_ok=True)
     unique_filename = f"{uuid.uuid4()}_{image.filename}"
@@ -60,7 +60,7 @@ async def save_image(image: UploadFile):
 
     image_array = await read_image(image, flags=cv.IMREAD_COLOR)
 
-    w, h, d = image_array.shape
+    h, w, d = image_array.shape
     size = Size(width=w, height=h, depth=d)
 
     image_annotation = ImageAnnotation(
@@ -74,8 +74,8 @@ async def save_image(image: UploadFile):
     return inserted
 
 
-@app.get("/image_annotation")
-async def get_image(image_id: str):
+@app.get("/image_annotation/")
+async def get_image(image_id: str) -> ImageAnnotation:
     result = await ImageAnnotation.get(image_id)
     return result
 
