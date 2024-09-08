@@ -10,3 +10,5 @@ motor
 pydantic-settings
 gdown
 beanie
+httpx
+pytest

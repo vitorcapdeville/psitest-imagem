@@ -7,3 +7,4 @@ test_images/
 raw_data/
 data/
 uploaded_images/
+tests/test_dataset/

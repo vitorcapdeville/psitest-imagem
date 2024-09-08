@@ -8,7 +8,7 @@ import gdown
 from motor.motor_asyncio import AsyncIOMotorClient
 from tqdm import tqdm
 
-from models import ImageAnnotation, Size, init
+from app.models import ImageAnnotation, Size, init
 
 output_folder = "raw_data"
 ids = {
