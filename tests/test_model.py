@@ -12,7 +12,7 @@ def model():
 
 @pytest.fixture
 def data():
-    return tf.data.Dataset.load("tests/test_dataset")
+    return tf.data.Dataset.load("tests/ds_test_sample")
 
 
 def test_model(model, data):
