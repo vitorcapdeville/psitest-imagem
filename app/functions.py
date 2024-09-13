@@ -5,7 +5,7 @@ import keras
 import numpy as np
 from fastapi import UploadFile
 
-from app.models import Box, Label
+from app.models import Box, Label, Object
 
 
 # Função para calcular a distância entre dois pontos
@@ -44,6 +44,40 @@ def classify_boxes(img: np.ndarray, boxes: list[Box], model: Any) -> tuple[list[
         confidence.append(np.max(prediction[0]))
         response.append(mapping_label[np.argmax(prediction[0])])
     return response, confidence
+
+
+def sort_objects(objects: list[Object], y_threshold=10) -> list[Object]:
+    objects_sorted = sorted(objects, key=lambda x: x.bounding_box.y_min)
+
+    questions = []
+    current_group = []
+
+    for box in objects_sorted:
+        if not current_group:
+            current_group.append(box)
+        else:
+            if abs(box.bounding_box.y_min - current_group[0].bounding_box.y_min) < y_threshold:
+                current_group.append(box)
+            else:
+                questions.append(sorted(current_group, key=lambda x: x.bounding_box.x_min))
+                current_group = [box]
+
+    if current_group:
+        questions.append(sorted(current_group, key=lambda x: x.bounding_box.x_min))
+
+    return questions
+
+
+def get_questions_and_answers(sorted_objects: list[Object]) -> tuple[list[Object], list[Object]]:
+    result = {}
+
+    for idx, question in enumerate(sorted_objects, start=1):
+        result[idx] = None
+        for option_idx, option in enumerate(question):
+            if option.name == Label.confirmed:
+                letra = chr(65 + option_idx)
+                result[idx] = letra
+    return result
 
 
 async def read_image(image: UploadFile, flags: int) -> np.ndarray:

@@ -10,7 +10,7 @@ import motor.motor_asyncio
 from fastapi import FastAPI, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.functions import classify_boxes, get_bounding_boxes, read_image
+from app.functions import classify_boxes, get_bounding_boxes, get_questions_and_answers, read_image, sort_objects
 from app.models import ImageAnnotation, Object, Size, init
 from app.settings import get_settings
 
@@ -142,3 +142,14 @@ async def find_answers(image_id: str) -> ImageAnnotation:
     await image_annotation.replace()
 
     return image_annotation
+
+
+@app.get("/questions_and_answers/")
+async def get_qa(image_id: str) -> dict:
+    image_annotation = await ImageAnnotation.get(image_id)
+    if len(image_annotation.objects) == 0:
+        return {}
+
+    sorted_objects = sort_objects(image_annotation.objects)
+    result = get_questions_and_answers(sorted_objects)
+    return result
