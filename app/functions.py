@@ -46,7 +46,7 @@ def classify_boxes(img: np.ndarray, boxes: list[Box], model: Any) -> tuple[list[
     return response, confidence
 
 
-def sort_objects(objects: list[Object], y_threshold=10) -> list[Object]:
+def sort_objects(objects: list[Object], y_threshold=20) -> list[Object]:
     objects_sorted = sorted(objects, key=lambda x: x.bounding_box.y_min)
 
     questions = []

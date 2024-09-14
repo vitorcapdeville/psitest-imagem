@@ -11,7 +11,7 @@ from fastapi import FastAPI, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.functions import classify_boxes, get_bounding_boxes, get_questions_and_answers, read_image, sort_objects
-from app.models import ImageAnnotation, Object, Size, init
+from app.models import ImageAnnotation, Label, Object, Size, init
 from app.settings import get_settings
 
 
@@ -90,8 +90,10 @@ async def show_image(image_id: str, show_annotations: bool = True):
             box = object.bounding_box
 
             color = {
-                "empty": (0, 0, 255),
-                "confirmed": (255, 0, 255),
+                Label.empty: (255, 0, 0),
+                Label.confirmed: (0, 255, 0),
+                Label.crossedout: (255, 255, 0),
+                Label.unpredicted: (0, 0, 255),
             }[object.name]
 
             cv.rectangle(img, (box.x_min, box.y_min), (box.x_max, box.y_max), color, 2)
