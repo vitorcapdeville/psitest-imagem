@@ -4,7 +4,7 @@ ruff
 opencv-python
 numpy
 keras>=3.5
-tensorflow
+tensorflow[and-cuda]
 pymongo
 motor
 pydantic-settings
@@ -12,3 +12,4 @@ gdown
 beanie
 httpx
 pytest
+scikit-learn
