@@ -2,7 +2,6 @@
 __pycache__/
 
 *.pyc
-test_images/
 .env
 raw_data/
 data/
