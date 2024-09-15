@@ -103,12 +103,20 @@ async def show_image(image_id: str, show_annotations: bool = True):
     return Response(content=encoded_img.tostring(), media_type="image/png")
 
 
-@app.delete("/delete_image")
+@app.delete("/delete_image/")
 async def delete_image(image_id: str):
     image_annotation = await ImageAnnotation.get(image_id)
     await image_annotation.delete()
     os.remove(image_annotation.path)
     return {"message": "Image deleted"}
+
+
+@app.put("/update_image/")
+async def update_image(image_id: str, objects: list[Object]):
+    image_annotation = await ImageAnnotation.get(image_id)
+    image_annotation.objects = objects
+    await image_annotation.replace()
+    return image_annotation
 
 
 @app.post("/find_boxes/")
