@@ -1,4 +1,4 @@
-# psitest-imagens
+# Psitest-Imagem
 
 ## Descrição
 
