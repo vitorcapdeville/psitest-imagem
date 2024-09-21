@@ -1,6 +1,7 @@
 import os
 import uuid
 from contextlib import asynccontextmanager
+from enum import Enum
 from logging import info
 from pathlib import Path
 
@@ -51,8 +52,18 @@ app.add_middleware(
 )
 
 
-@app.post("/save_image")
+class Tag(Enum):
+    Manage = "Manage"
+    Manipulate = "Manipulate"
+
+
+@app.post("/save_image", summary="Save an image to the database", tags=[Tag.Manage])
 async def save_image(image: UploadFile) -> ImageAnnotation:
+    """
+    Upload a image, save it to disk and create an entry for it in the database.
+
+    Returns the created entry, with the image id, needed for manipulating the image afterwards.
+    """
     out_dir = Path("uploaded_images")
     out_dir.mkdir(parents=True, exist_ok=True)
     unique_filename = f"{uuid.uuid4()}_{image.filename}"
@@ -74,14 +85,22 @@ async def save_image(image: UploadFile) -> ImageAnnotation:
     return inserted
 
 
-@app.get("/image_annotation/")
+@app.get("/image_annotation/", summary="Get an image's annotations", tags=[Tag.Manage])
 async def get_image(image_id: str) -> ImageAnnotation:
+    """
+    Given the id of a image in the database, returns it`s annotations.
+    """
     result = await ImageAnnotation.get(image_id)
     return result
 
 
-@app.get("/show_image/")
+@app.get("/show_image/", summary="Show an image", tags=[Tag.Manage])
 async def show_image(image_id: str, show_annotations: bool = True):
+    """
+    Given the id of a image in the database, returns the file containing the image.
+
+    It`s also possible to return the image file with the existing annotations drawn on it.
+    """
     result = await ImageAnnotation.get(image_id)
     img = cv.imread(result.path, cv.IMREAD_COLOR)
 
@@ -103,24 +122,34 @@ async def show_image(image_id: str, show_annotations: bool = True):
     return Response(content=encoded_img.tostring(), media_type="image/png")
 
 
-@app.delete("/delete_image/")
+@app.delete("/delete_image/", summary="Delete an existing image", tags=[Tag.Manage])
 async def delete_image(image_id: str):
+    """
+    Given the id of a image in the database, deletes it`s entry and the file containing the image.
+    """
     image_annotation = await ImageAnnotation.get(image_id)
     await image_annotation.delete()
     os.remove(image_annotation.path)
     return {"message": "Image deleted"}
 
 
-@app.put("/update_image/")
+@app.put("/update_image/", summary="Edit image`s annotations", tags=[Tag.Manage])
 async def update_image(image_id: str, objects: list[Object]):
+    """
+    Given the id of a image in the database and a list of Objects, replace the current image annotions.
+    """
     image_annotation = await ImageAnnotation.get(image_id)
     image_annotation.objects = objects
     await image_annotation.replace()
     return image_annotation
 
 
-@app.post("/find_boxes/")
+@app.post("/find_boxes/", summary="Find boxes in an image", tags=[Tag.Manipulate])
 async def find_boxes(image_id: str, box_images: list[UploadFile], threshold: float = 0.5) -> ImageAnnotation:
+    """
+    Use OpenCV`s template matching to find answer boxes in an image, and replace the current image`s annotations
+    with them.
+    """
     image_annotation = await ImageAnnotation.get(image_id)
 
     img_rgb = cv.imread(image_annotation.path)
@@ -132,8 +161,14 @@ async def find_boxes(image_id: str, box_images: list[UploadFile], threshold: flo
     return image_annotation
 
 
-@app.post("/find_answers/")
+@app.post("/find_answers/", summary="Classify the boxes in an image", tags=[Tag.Manipulate])
 async def find_answers(image_id: str) -> ImageAnnotation:
+    """
+    Use a pre-trained model to classify the boxes in an image, and replace the current image`s annotations with them.
+
+    Note that for this route to function properly, the image must already have the boxes annotated.
+    """
+
     image_annotation = await ImageAnnotation.get(image_id)
     if len(image_annotation.objects) == 0:
         return image_annotation
@@ -154,8 +189,15 @@ async def find_answers(image_id: str) -> ImageAnnotation:
     return image_annotation
 
 
-@app.get("/questions_and_answers/")
+@app.get("/questions_and_answers/", summary="Convert the annotations into final data", tags=[Tag.Manipulate])
 async def get_qa(image_id: str) -> dict:
+    """
+    Uses the annotations of an image to return the chosen answer for each question.
+
+    The questions are sorted by their position in the image, from left to right first, then top to bottom.
+    All boxes with approximately the same x position are considered to be in the same row.
+    If more than one box is marked as confirmed in the same row, the last one is considered to be the answer.
+    """
     image_annotation = await ImageAnnotation.get(image_id)
     if len(image_annotation.objects) == 0:
         return {}
