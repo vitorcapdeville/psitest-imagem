@@ -36,3 +36,22 @@ fastapi run app --port 8000
 ```
 
 O servidor estará disponível em `http://localhost:8000`.
+
+## Intalação via Docker
+
+Para utilizar o serviço via Docker, é necessário ter o Docker instalado na máquina.
+
+Primeiro, é preciso garantir a existência da network `psitest`.
+
+```bash
+docker network create psitest
+```
+
+Em seguida, execute o comando para criar a imagem e o container do serviço.
+
+```bash
+docker compose up
+```
+
+O serviço estará disponível em `http://localhost:8000`.
+O MongoDB estará disponível em `http://localhost:27017`.

@@ -1,0 +1,24 @@
+services:
+  images:
+    build: .
+    container_name: psitest-imagem
+    command: fastapi run app --host 0.0.0.0 --port 80
+    ports:
+      - 8000:80
+    networks:
+      - psitest
+    environment:
+      - MONGODB_URL=mongodb://mongodb:27017
+    env_file: ".env"
+    depends_on:
+      - mongodb
+  mongodb:
+    image: mongo:6-jammy
+    ports:
+      - '27017:27017'
+    networks:
+      - psitest
+
+networks:
+  psitest:
+    external: true
