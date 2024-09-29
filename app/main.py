@@ -41,6 +41,7 @@ app = FastAPI(lifespan=lifespan)
 origins = [
     "http://localhost",
     "http://localhost:3000",
+    "https://psitest-imagem-front.vercel.app"
 ]
 
 app.add_middleware(
